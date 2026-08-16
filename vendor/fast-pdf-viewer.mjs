@@ -185,11 +185,71 @@ function rerenderVisible() {
   const primary = currentPage;
   const secondary = [...visiblePages].filter(number => number !== primary);
   // 操作中のページを最優先で高精細化し、前後ページはその後に処理する。
-  renderPage(primary, true).finally(() => {
-    if (generation !== renderGeneration) return;
-    for (const number of secondary) renderPage(number, true);
-  });
   updateControls();
+  const primaryRender = renderPage(primary, true);
+  return primaryRender.then(() => {
+    if (generation !== renderGeneration) return;
+    return Promise.all(secondary.map(number => renderPage(number, true)));
+  });
+}
+
+let zoomLockedPage = null;
+let zoomOperation = 0;
+
+function captureZoomAnchor(point) {
+  const containerRect = viewerContainer.getBoundingClientRect();
+  const hit = document.elementFromPoint(containerRect.left + point.x, containerRect.top + point.y);
+  const page = hit?.closest?.(".page") || pageElement(currentPage);
+  if (!page) return null;
+  const canvas = page.querySelector("canvas");
+  const canvasRect = canvas?.getBoundingClientRect();
+  const hitX = containerRect.left + point.x;
+  const hitY = containerRect.top + point.y;
+  const onCanvas = !!canvasRect &&
+    hitX >= canvasRect.left && hitX <= canvasRect.right &&
+    hitY >= canvasRect.top && hitY <= canvasRect.bottom;
+  const target = onCanvas ? canvas : page;
+  const targetRect = target.getBoundingClientRect();
+  return {
+    pageNumber:Number(page.dataset.pageNumber) || currentPage,
+    target:onCanvas ? "canvas" : "page",
+    ratioX:Math.min(1, Math.max(0, (hitX - targetRect.left) / Math.max(1, targetRect.width))),
+    ratioY:Math.min(1, Math.max(0, (hitY - targetRect.top) / Math.max(1, targetRect.height))),
+    point:{ x:point.x, y:point.y }
+  };
+}
+
+function restoreZoomAnchor(anchor, point=anchor?.point) {
+  if (!anchor || !point) return;
+  const page = pageElement(anchor.pageNumber);
+  const target = anchor.target === "canvas" ? page?.querySelector("canvas") : page;
+  if (!page || !target) return;
+  const containerRect = viewerContainer.getBoundingClientRect();
+  const targetRect = target.getBoundingClientRect();
+  const contentLeft = viewerContainer.scrollLeft + targetRect.left - containerRect.left;
+  const contentTop = viewerContainer.scrollTop + targetRect.top - containerRect.top;
+  viewerContainer.scrollLeft = Math.max(0, contentLeft + targetRect.width * anchor.ratioX - point.x);
+  viewerContainer.scrollTop = Math.max(0, contentTop + targetRect.height * anchor.ratioY - point.y);
+}
+
+function beginZoomLock(anchor) {
+  const token = ++zoomOperation;
+  if (anchor) {
+    zoomLockedPage = anchor.pageNumber;
+    currentPage = anchor.pageNumber;
+    updateControls();
+  }
+  return token;
+}
+
+function finishZoomLock(token, anchor, point, renderPromise) {
+  Promise.resolve(renderPromise).finally(() => requestAnimationFrame(() => {
+    if (token !== zoomOperation) return;
+    restoreZoomAnchor(anchor, point);
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      if (token === zoomOperation) zoomLockedPage = null;
+    }));
+  }));
 }
 
 function setZoom(scale) {
@@ -200,14 +260,13 @@ function setZoom(scale) {
     x:viewerContainer.clientWidth / 2,
     y:viewerContainer.clientHeight / 2
   };
-  const anchorContentX = viewerContainer.scrollLeft + point.x;
-  const anchorContentY = viewerContainer.scrollTop + point.y;
+  const anchor = captureZoomAnchor(point);
+  const token = beginZoomLock(anchor);
   scaleLoadedPages(factor);
   fitWidth = false;
   explicitScale = targetScale;
-  viewerContainer.scrollLeft = Math.max(0, anchorContentX * factor - point.x);
-  viewerContainer.scrollTop = Math.max(0, anchorContentY * factor - point.y);
-  rerenderVisible();
+  restoreZoomAnchor(anchor, point);
+  finishZoomLock(token, anchor, point, rerenderVisible());
 }
 
 function zoomBase() {
@@ -233,6 +292,13 @@ viewerContainer.addEventListener("scroll", () => {
   if (scrollFrame) cancelAnimationFrame(scrollFrame);
   scrollFrame = requestAnimationFrame(() => {
     scrollFrame = null;
+    if (zoomLockedPage !== null) {
+      if (currentPage !== zoomLockedPage) {
+        currentPage = zoomLockedPage;
+        updateControls();
+      }
+      return;
+    }
     const containerRect = viewerContainer.getBoundingClientRect();
     let nearest = null;
     for (const [number, element] of pageElements) {
@@ -257,8 +323,11 @@ pageNumber.addEventListener("keydown", event => {
 zoomOutButton.addEventListener("click", () => setZoom(zoomBase() / 1.2));
 zoomInButton.addEventListener("click", () => setZoom(zoomBase() * 1.2));
 fitWidthButton.addEventListener("click", () => {
+  const point = { x:viewerContainer.clientWidth / 2, y:viewerContainer.clientHeight / 2 };
+  const anchor = captureZoomAnchor(point);
+  const token = beginZoomLock(anchor);
   fitWidth = true;
-  rerenderVisible();
+  finishZoomLock(token, anchor, point, rerenderVisible());
 });
 openFileButton.addEventListener("click", () => fileUrl && window.open(fileUrl.href, "_blank"));
 
@@ -290,14 +359,14 @@ function commitPinchGesture(gesture) {
   }
 
   clearPinchPreview();
-  viewerContainer.scrollLeft = Math.max(0, gesture.anchorContentX * factor - gesture.point.x);
-  viewerContainer.scrollTop = Math.max(0, gesture.anchorContentY * factor - gesture.point.y);
+  restoreZoomAnchor(gesture.anchor, gesture.point);
 
   if (scaleChanged) {
     fitWidth = false;
     explicitScale = gesture.targetScale;
-    rerenderVisible();
+    finishZoomLock(gesture.lockToken, gesture.anchor, gesture.point, rerenderVisible());
   } else {
+    if (gesture.lockToken === zoomOperation) zoomLockedPage = null;
     updateControls();
   }
 }
@@ -305,6 +374,8 @@ viewerContainer.addEventListener("touchstart", event => {
   if (event.touches.length !== 2 || !pdfDocument) return;
   const point = midpoint(event.touches);
   const baseScale = zoomBase();
+  const anchor = captureZoomAnchor(point);
+  const lockToken = beginZoomLock(anchor);
   pinchGesture = {
     startDistance:Math.max(1, distance(event.touches)),
     baseScale,
@@ -312,6 +383,8 @@ viewerContainer.addEventListener("touchstart", event => {
     targetScale:baseScale,
     startPoint:point,
     point,
+    anchor,
+    lockToken,
     startScrollLeft:viewerContainer.scrollLeft,
     startScrollTop:viewerContainer.scrollTop,
     anchorContentX:viewerContainer.scrollLeft + point.x,
@@ -347,8 +420,13 @@ viewerContainer.addEventListener("touchend", event => {
 }, { passive:false });
 viewerContainer.addEventListener("touchcancel", () => {
   if (!pinchGesture) return;
+  const gesture = pinchGesture;
   pinchGesture = null;
   clearPinchPreview();
+  if (gesture.lockToken === zoomOperation) {
+    zoomOperation += 1;
+    zoomLockedPage = null;
+  }
   updateControls();
 }, { passive:true });
 

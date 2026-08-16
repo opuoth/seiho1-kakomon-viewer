@@ -1,11 +1,11 @@
-const CACHE_NAME = "seiho1-viewer-v17";
+const CACHE_NAME = "seiho1-viewer-v19";
 
 const CACHE_TARGETS = [
   "./",
   "./index.html",
-  "./vendor/fast-pdf-viewer.html?v=10",
+  "./vendor/fast-pdf-viewer.html?v=12",
   "./vendor/fast-pdf-viewer.css?v=6",
-  "./vendor/fast-pdf-viewer.mjs?v=10"
+  "./vendor/fast-pdf-viewer.mjs?v=12"
 ];
 
 self.addEventListener("install", event => {
