@@ -1,0 +1,4 @@
+/audit_run_*/
+/final_audit_checkpoints/
+/backups/
+*.bak

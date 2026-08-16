@@ -1,0 +1,23 @@
+/*
+  Cache-Control: public, max-age=0, must-revalidate
+
+/*.html
+  Cache-Control: public, max-age=0, must-revalidate
+
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/pdfs/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/data/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/vendor/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/exams/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/textbooks/*
+  Cache-Control: public, max-age=31536000, immutable

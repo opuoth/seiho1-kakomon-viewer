@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>PDF Viewer</title>
+<link rel="stylesheet" href="fast-pdf-viewer.css?v=4">
+</head>
+<body>
+  <div id="toolbarContainer" class="toolbar" role="toolbar" aria-label="PDF操作">
+    <button id="previousPageButton" type="button" aria-label="前のページ">‹</button>
+    <div class="pageControl">
+      <input id="pageNumber" type="number" min="1" value="1" inputmode="numeric" aria-label="ページ番号">
+      <span>/</span><span id="pageCount">–</span>
+    </div>
+    <button id="nextPageButton" type="button" aria-label="次のページ">›</button>
+    <span class="separator"></span>
+    <button id="zoomOutButton" type="button" aria-label="縮小">−</button>
+    <span id="zoomValue" class="zoomValue">幅</span>
+    <button id="zoomInButton" type="button" aria-label="拡大">＋</button>
+    <button id="fitWidthButton" type="button" aria-label="幅に合わせる">幅</button>
+    <button id="openFileButton" type="button" aria-label="別タブで開く">↗</button>
+  </div>
+  <div id="viewerContainer" tabindex="0">
+    <div id="viewer"></div>
+  </div>
+  <div id="loadingMessage" class="status">PDFを読み込み中…</div>
+  <div id="errorMessage" class="status error" hidden></div>
+  <script type="module" src="fast-pdf-viewer.mjs?v=8"></script>
+</body>
+</html>
