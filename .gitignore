@@ -2,3 +2,5 @@
 /final_audit_checkpoints/
 /backups/
 *.bak
+/vendor/pdfjs-5.7.284/
+/vendor/pdfjs-5.7.284-legacy-dist.zip
