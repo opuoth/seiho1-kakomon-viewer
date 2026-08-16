@@ -31,6 +31,11 @@ const visiblePages = new Set();
 const renderTasks = new Map();
 const MAX_OUTPUT_SCALE = 2;
 const MAX_CANVAS_PIXELS = 8_000_000;
+const viewportPageQuery = matchMedia("(max-width:1024px)");
+
+function usesViewportPageSlots() {
+  return viewportPageQuery.matches;
+}
 
 function hashPage() {
   const page = Number(new URLSearchParams(location.hash.slice(1)).get("page"));
@@ -65,10 +70,12 @@ function outputScaleFor(viewport) {
 function applyPageSize(element, canvas, width, height) {
   const cssWidth = Math.max(1, width);
   const cssHeight = Math.max(1, height);
+  const pageWidth = usesViewportPageSlots() ? Math.max(cssWidth, viewerContainer.clientWidth) : cssWidth;
+  const pageHeight = usesViewportPageSlots() ? Math.max(cssHeight, viewerContainer.clientHeight) : cssHeight;
   canvas.style.width = `${cssWidth}px`;
   canvas.style.height = `${cssHeight}px`;
-  element.style.width = `${cssWidth}px`;
-  element.style.height = `${cssHeight}px`;
+  element.style.width = `${pageWidth}px`;
+  element.style.height = `${pageHeight}px`;
 }
 
 function scaleLoadedPages(factor) {
@@ -98,7 +105,7 @@ async function renderPage(number, force=false) {
     const page = await pdfDocument.getPage(number);
     if (targetGeneration !== renderGeneration) return;
     const baseViewport = page.getViewport({ scale:1 });
-    const availableWidth = Math.max(120, viewerContainer.clientWidth - (innerWidth <= 480 ? 12 : 24));
+    const availableWidth = Math.max(120, viewerContainer.clientWidth - (innerWidth <= 480 ? 4 : 24));
     const scale = fitWidth ? availableWidth / baseViewport.width : explicitScale;
     const viewport = page.getViewport({ scale });
     // Retina端末では最大2倍で描画する。高倍率時だけキャンバス面積に応じて
@@ -142,6 +149,10 @@ function createPages() {
     element.className = "page";
     element.dataset.pageNumber = String(number);
     element.dataset.loaded = "false";
+    if (usesViewportPageSlots()) {
+      element.style.width = `${viewerContainer.clientWidth}px`;
+      element.style.height = `${viewerContainer.clientHeight}px`;
+    }
     pageElements.set(number, element);
     viewer.append(element);
     pageObserver.observe(element);
@@ -153,8 +164,13 @@ function setCurrentPage(number, scroll=true) {
   currentPage = Math.min(pdfDocument.numPages, Math.max(1, Math.floor(Number(number) || 1)));
   updateControls();
   const element = pageElement(currentPage);
-  renderPage(currentPage);
-  if (scroll && element) element.scrollIntoView({ block:"start" });
+  const renderPromise = renderPage(currentPage);
+  const alignPage = () => {
+    if (!scroll || !element) return;
+    viewerContainer.scrollTop = element.offsetTop;
+  };
+  alignPage();
+  renderPromise.finally(() => requestAnimationFrame(alignPage));
   const hash = new URLSearchParams({ page:String(currentPage), zoom:fitWidth ? "page-width" : String(explicitScale) });
   history.replaceState(null, "", `#${hash}`);
 }

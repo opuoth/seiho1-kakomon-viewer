@@ -99,6 +99,8 @@ button.primary { background:#1d4ed8; border-color:#3b82f6; } button.primary:hove
   .app.catalogOpen .right { display:none; }
   .app:not(.catalogOpen) .left { display:none; }
   .app:not(.catalogOpen) .right { display:grid; }
+  body.compactPdfOpen header { display:none; }
+  body.compactPdfOpen .app { height:100dvh; }
   .appResizer, .paneResizer { display:none !important; }
   .left { min-width:0; border:0; }
   .tabs { padding:6px 8px 0; gap:5px; }
@@ -119,28 +121,25 @@ button.primary { background:#1d4ed8; border-color:#3b82f6; } button.primary:hove
 
   /* 一覧とPDFを画面単位で切り替え、PDF表示領域を確保する。 */
   .viewerbar {
-    min-height:0;
-    padding:6px 8px;
-    display:grid;
-    grid-template-columns:36px 36px minmax(58px,1fr) 44px 44px 44px;
-    grid-template-rows:36px 40px;
-    gap:5px 4px;
+    min-height:48px;
+    height:48px;
+    padding:4px 6px;
+    display:flex;
+    gap:4px;
     align-items:center;
     border-bottom:1px solid #334155;
+    overflow-x:auto;
+    scrollbar-width:none;
   }
-  #mobileCatalogBtn { display:block; grid-column:1; grid-row:1; width:36px; height:36px; padding:0; border-color:#64748b; background:#334155; font-weight:700; }
-  .viewerinfo { grid-column:2 / -1; grid-row:1; min-width:0; }
+  .viewerbar::-webkit-scrollbar { display:none; }
+  #mobileCatalogBtn { display:block; flex:0 0 40px; width:40px; height:40px; padding:0; border-color:#64748b; background:#334155; font-weight:700; }
+  .viewerinfo { flex:1 1 auto; min-width:80px; }
   .viewerinfo .main { font-size:12px; line-height:1.25; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .viewerinfo .sub { display:none; }
   .resizeHint { display:none; }
   .pdfSizeControls { display:none; }
-  .viewerbar button { min-width:0; height:40px; padding:5px 4px; border-radius:8px; font-size:11px; touch-action:manipulation; }
-  #prevBtn { grid-column:1; grid-row:2; }
-  #nextBtn { grid-column:2; grid-row:2; }
-  #toggleAnswerBtn { grid-column:3; grid-row:2; min-width:0; }
-  #toggleProblemBtn { grid-column:4; grid-row:2; }
-  #toggleTextbookBtn { grid-column:5; grid-row:2; }
-  #openOfficialBtn { grid-column:6; grid-row:2; }
+  .viewerbar button { flex:0 0 auto; min-width:0; height:40px; padding:5px 7px; border-radius:8px; font-size:11px; touch-action:manipulation; }
+  #prevBtn, #nextBtn { width:38px; padding-inline:0; }
   #toggleProblemBtn, #toggleTextbookBtn { min-width:0; }
   .viewerbar button.viewActive { background:#e0ecff; border-color:#93c5fd; color:#1e3a8a; font-weight:700; }
 
@@ -185,6 +184,8 @@ button.primary { background:#1d4ed8; border-color:#3b82f6; } button.primary:hove
 }
 
 @media (max-width:600px) {
+  body.compactPdfOpen .viewerinfo { display:none; }
+  body.compactPdfOpen .viewerbar button:not(#mobileCatalogBtn) { flex:1 1 0; padding-inline:3px; }
   .row .heading, .row .refs { display:-webkit-box; overflow:hidden; -webkit-box-orient:vertical; -webkit-line-clamp:2; }
   .row .memo { display:none; }
 }
@@ -414,6 +415,7 @@ function shouldUsePdfJs() { return touchPdfQuery.matches; }
 function updateCatalogControls() {
   const compact = isCompactWorkspace();
   appEl.classList.toggle("catalogOpen", compact && catalogOpen);
+  document.body.classList.toggle("compactPdfOpen", compact && !catalogOpen);
   const resumeButton = el("resumeViewerBtn");
   resumeButton.hidden = !compact || !catalogOpen || currentIndex < 0;
 }
@@ -669,7 +671,7 @@ function renderList() {
 }
 
 let iframeLoadSeq = 0;
-const PDFJS_LEGACY_VIEWER_PATH = "vendor/fast-pdf-viewer.html?v=8";
+const PDFJS_LEGACY_VIEWER_PATH = "vendor/fast-pdf-viewer.html?v=10";
 
 function parsePdfTarget(url) {
   const raw = String(url || "").split("\\").join("/");
